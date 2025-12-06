@@ -1,166 +1,102 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
+import React, { useEffect } from "react";
+import { useSocket } from "@/context/SocketContext";
+import { useChatStore } from "@/hooks/useChatStore";
 import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
-import { ShoppingBag } from "lucide-react";
-
-interface Conversation {
-    id: number;
-    buyerId: number;
-    storeId: number;
-    lastMessageAt: string;
-    store?: {
-        id: number;
-        name: string;
-        logo?: string;
-    };
-    buyer?: {
-        id: number;
-        name: string;
-        avatarUrl?: string;
-    };
-    product?: {
-        id: number;
-        name: string;
-        imageUrl?: string;
-    };
-    messages: {
-        content: string;
-        isRead: boolean;
-        createdAt: string;
-        senderId: number; // Ensure API returns this
-    }[];
-}
+import { Loader2 } from "lucide-react";
 
 interface ConversationListProps {
     onSelect: (id: number) => void;
-    selectedId?: number | null;
+    selectedId: number | null;
 }
 
-export function ConversationList({ onSelect, selectedId }: ConversationListProps) {
-    const { user } = useAuth();
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [loading, setLoading] = useState(true);
+export const ConversationList = ({ onSelect, selectedId }: ConversationListProps) => {
+    const { conversations, setConversations, activeConversationId, updateConversationLastMessage, typingUsers } = useChatStore();
+    const [loading, setLoading] = React.useState(true);
+    const { socket } = useSocket();
 
     useEffect(() => {
         const fetchConversations = async () => {
             try {
-                const token = localStorage.getItem("token");
-                if (!token) return;
-
-                const res = await axios.get("/api/conversations", {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                setConversations(res.data);
+                const res = await fetch("/api/conversations");
+                if (res.ok) {
+                    const data = await res.json();
+                    setConversations(data);
+                }
             } catch (error) {
-                console.error("Error fetching conversations:", error);
+                console.error(error);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchConversations();
-        const interval = setInterval(fetchConversations, 10000);
-        return () => clearInterval(interval);
-    }, []);
+    }, [setConversations]);
+
+    // Listen for global new messages to update list order/preview
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNewMessage = (message: any) => {
+            updateConversationLastMessage(message.conversationId, message);
+        };
+
+        socket.on("message:new", handleNewMessage);
+        return () => {
+            socket.off("message:new", handleNewMessage);
+        };
+    }, [socket, updateConversationLastMessage]);
 
     if (loading) {
-        return <div className="p-4 text-center text-sm text-muted-foreground animate-pulse">Cargando conversaciones...</div>;
-    }
-
-    if (conversations.length === 0) {
-        return (
-            <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <ShoppingBag className="h-8 w-8 opacity-20" />
-                <p className="text-sm">No tienes mensajes.</p>
-            </div>
-        );
+        return <div className="p-4 flex justify-center"><Loader2 className="animate-spin" /></div>;
     }
 
     return (
-        <div className="space-y-2 overflow-y-auto h-full p-2">
-            {conversations.map((conv) => {
-                const otherParty = user?.role === "comprador"
-                    ? {
-                        name: conv.store?.name || "Tienda",
-                        image: conv.store?.logo,
-                    }
-                    : {
-                        name: conv.buyer?.name || "Comprador",
-                        image: conv.buyer?.avatarUrl,
-                    };
-
-                const lastMessage = conv.messages[0];
-                const hasUnread = lastMessage && !lastMessage.isRead && lastMessage.senderId !== Number(user?.id);
-
-                return (
-                    <Card
-                        key={conv.id}
-                        className={cn(
-                            "p-3 cursor-pointer hover:bg-accent/50 transition-all border-transparent hover:border-border",
-                            selectedId === conv.id ? "bg-accent border-primary shadow-sm" : "bg-card"
-                        )}
-                        onClick={() => onSelect(conv.id)}
-                    >
-                        <div className="flex gap-3">
-                            <div className="relative">
-                                <Avatar className="h-10 w-10 border">
-                                    <AvatarImage src={otherParty.image} />
-                                    <AvatarFallback>{otherParty.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                {conv.product && (
-                                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5 border shadow-sm" title={conv.product.name}>
-                                        <Avatar className="h-4 w-4">
-                                            <AvatarImage src={conv.product.imageUrl} className="object-cover" />
-                                            <AvatarFallback><ShoppingBag className="h-2 w-2" /></AvatarFallback>
-                                        </Avatar>
-                                    </div>
+        <div className="flex flex-col h-full bg-white border-r">
+            <div className="p-4 border-b">
+                <h2 className="font-bold text-xl">Mensajes</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+                {conversations.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground">No tienes conversaciones aún.</div>
+                ) : (
+                    conversations.map((conv) => {
+                        const isTyping = (typingUsers[conv.id] || []).length > 0;
+                        return (
+                            <button
+                                key={conv.id}
+                                onClick={() => onSelect(conv.id)}
+                                className={cn(
+                                    "w-full text-left p-4 hover:bg-slate-50 transition-colors border-b last:border-0 flex gap-3",
+                                    selectedId === conv.id && "bg-slate-100 ring-2 ring-inset ring-primary/10"
                                 )}
-                            </div>
-
-                            <div className="flex-1 overflow-hidden">
-                                <div className="flex justify-between items-baseline mb-0.5">
-                                    <h4 className={cn("text-sm truncate", hasUnread ? "font-bold" : "font-medium")}>
-                                        {otherParty.name}
-                                    </h4>
-                                    {conv.lastMessageAt && (
-                                        <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                                            {formatDistanceToNow(new Date(conv.lastMessageAt), {
-                                                addSuffix: false,
-                                                locale: es,
-                                            })}
+                            >
+                                <div className="w-12 h-12 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center font-bold text-slate-500">
+                                    {conv.store?.name?.[0] || conv.buyer?.name?.[0]}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-baseline mb-1">
+                                        <h4 className="font-semibold truncate pr-2">
+                                            {conv.store?.name || conv.buyer?.name}
+                                        </h4>
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                            {conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : ""}
                                         </span>
-                                    )}
-                                </div>
-
-                                {conv.product && (
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-1">
-                                        <ShoppingBag className="h-3 w-3" />
-                                        <span className="truncate max-w-[120px]">{conv.product.name}</span>
                                     </div>
-                                )}
-
-                                <p className={cn("text-xs truncate", hasUnread ? "font-semibold text-foreground" : "text-muted-foreground")}>
-                                    {lastMessage?.senderId === Number(user?.id) && "Tú: "}
-                                    {lastMessage?.content || "Nueva conversación"}
-                                </p>
-                            </div>
-
-                            {hasUnread && (
-                                <div className="self-center">
-                                    <div className="h-2 w-2 rounded-full bg-primary" />
+                                    <p className="text-sm text-muted-foreground truncate">
+                                        {isTyping ? (
+                                            <span className="text-primary italic">Escribiendo...</span>
+                                        ) : (
+                                            conv.lastMessage?.content || "Empezar conversación"
+                                        )}
+                                    </p>
                                 </div>
-                            )}
-                        </div>
-                    </Card>
-                );
-            })}
+                            </button>
+                        );
+                    })
+                )}
+            </div>
         </div>
     );
-}
+};

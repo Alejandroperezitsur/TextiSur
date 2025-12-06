@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MessageService } from "@/services/messageService";
 import { ChatService } from "@/services/chatService";
 import jwt from "jsonwebtoken";
 
@@ -21,17 +22,29 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         }
 
         const conversationId = parseInt(params.id);
-        if (isNaN(conversationId)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        if (isNaN(conversationId)) {
+            return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+        }
 
+        // Verify access
         const conversation = await ChatService.getConversationDetails(conversationId, user.id);
-
         if (!conversation) {
             return NextResponse.json({ error: "Not found or Forbidden" }, { status: 404 });
         }
 
-        return NextResponse.json(conversation);
+        const url = new URL(req.url);
+        const limit = parseInt(url.searchParams.get("limit") || "50");
+        const offset = parseInt(url.searchParams.get("offset") || "0");
+
+        const messages = await MessageService.getMessages(conversationId, limit, offset);
+
+        // Mark as read (async fire and forget)
+        MessageService.markAsRead(conversationId, user.id).catch(console.error);
+
+        return NextResponse.json(messages);
+
     } catch (error) {
-        console.error("Error fetching conversation details:", error);
+        console.error("Error fetching messages:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

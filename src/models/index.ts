@@ -4,7 +4,7 @@ import Product from "./Product";
 import Order from "./Order";
 import Conversation from "./Conversation";
 import Message from "./Message";
-
+import Reaction from "./Reaction";
 import Block from "./Block";
 
 // Define associations
@@ -31,6 +31,15 @@ Conversation.belongsTo(User, { foreignKey: "blockedBy", as: "blocker" });
 // Message associations
 Message.belongsTo(Conversation, { foreignKey: "conversationId", as: "conversation" });
 Message.belongsTo(User, { foreignKey: "senderId", as: "sender" });
+Message.hasMany(Reaction, { foreignKey: "messageId", as: "reactions" });
+Message.belongsTo(Message, { foreignKey: "replyToId", as: "replyTo" });
+
+// Reaction associations
+Reaction.belongsTo(Message, { foreignKey: "messageId", as: "message" });
+Reaction.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+// User associations (add reaction)
+User.hasMany(Reaction, { foreignKey: "userId", as: "reactions" });
 
 // Block associations
 Block.belongsTo(User, { foreignKey: "blockerId", as: "blocker" });
@@ -43,4 +52,4 @@ User.hasMany(Conversation, { foreignKey: "buyerId", as: "conversationsAsBuyer" }
 Store.hasMany(Conversation, { foreignKey: "storeId", as: "conversations" });
 
 // Export models
-export { User, Store, Product, Order, Conversation, Message, Block };
+export { User, Store, Product, Order, Conversation, Message, Block, Reaction };

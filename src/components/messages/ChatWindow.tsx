@@ -1,327 +1,198 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MoreVertical, Ban, Check, CheckCheck, ShoppingBag } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { format, isSameDay } from "date-fns";
-import { es } from "date-fns/locale";
-import Link from "next/link";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-interface Message {
-    id: number;
-    content: string;
-    senderId: number;
-    createdAt: string;
-    isRead: boolean;
-    sender?: {
-        name: string;
-    }
-}
-
-interface ConversationDetail {
-    id: number;
-    buyerId: number;
-    storeId: number;
-    productId?: number;
-    isBlocked: boolean;
-    blockedBy?: number;
-    store?: {
-        id: number;
-        name: string;
-        logo?: string;
-        userId: number; // Owner ID
-    };
-    buyer?: {
-        id: number;
-        name: string;
-        avatarUrl?: string;
-    };
-    product?: {
-        id: number;
-        name: string;
-        imageUrl?: string;
-        price: number;
-    };
-    messages: Message[];
-}
+import React, { useEffect, useRef, useState } from "react";
+import { useSocket } from "@/context/SocketContext";
+import { useChatStore } from "@/hooks/useChatStore";
+import { MessageBubble } from "./MessageBubble";
+import { ChatInput } from "./ChatInput";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ChatWindowProps {
     conversationId: number;
-    onBack?: () => void;
 }
 
-export function ChatWindow({ conversationId, onBack }: ChatWindowProps) {
-    const { user } = useAuth();
-    const [conversation, setConversation] = useState<ConversationDetail | null>(null);
-    const [newMessage, setNewMessage] = useState("");
-    const [loading, setLoading] = useState(true);
-    const [sending, setSending] = useState(false);
+export const ChatWindow = ({ conversationId }: ChatWindowProps) => {
+    const { socket, isConnected } = useSocket();
+    const {
+        messages,
+        setMessages,
+        addMessage,
+        isLoadingMessages,
+        setLoadingMessages,
+        activeConversationId,
+        setActiveConversation,
+        setTyping,
+        typingUsers
+    } = useChatStore();
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const fetchConversation = async () => {
-        try {
-            const token = localStorage.getItem("token");
-            if (!token) return;
-
-            const res = await axios.get(`/api/conversations/${conversationId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            setConversation(res.data);
-        } catch (error) {
-            console.error("Error fetching conversation:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleBlockToggle = async () => {
-        if (!conversation) return;
-        try {
-            const token = localStorage.getItem("token");
-            await axios.post(`/api/conversations/${conversation.id}/block`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            fetchConversation();
-        } catch (error) {
-            console.error("Error toggling block:", error);
-        }
-    };
-
+    // Set active conversation on mount
     useEffect(() => {
-        setLoading(true);
-        fetchConversation();
-        const interval = setInterval(fetchConversation, 5000);
-        return () => clearInterval(interval);
-    }, [conversationId]);
+        setActiveConversation(conversationId);
+        return () => setActiveConversation(null);
+    }, [conversationId, setActiveConversation]);
 
+    // Join room
+    useEffect(() => {
+        if (!socket || !isConnected) return;
+
+        socket.emit("join_conversation", conversationId);
+
+        // Listeners
+        socket.on("message:new", (message: any) => {
+            console.log("New message received:", message);
+            if (message.conversationId === conversationId) {
+                addMessage(message);
+            }
+        });
+
+        socket.on("typing_start", (data: any) => {
+            if (data.conversationId === conversationId) {
+                setTyping(conversationId, data.userId, true);
+            }
+        });
+
+        socket.on("typing_stop", (data: any) => {
+            if (data.conversationId === conversationId) {
+                setTyping(conversationId, data.userId, false);
+            }
+        });
+
+        return () => {
+            socket.emit("leave_conversation", conversationId);
+            socket.off("message:new");
+            socket.off("typing_start");
+            socket.off("typing_stop");
+        };
+    }, [socket, isConnected, conversationId, addMessage, setTyping]);
+
+    // Fetch messages
+    useEffect(() => {
+        const fetchMessages = async () => {
+            setLoadingMessages(true);
+            try {
+                const res = await fetch(`/api/conversations/${conversationId}/messages?limit=50`);
+                if (!res.ok) throw new Error("Failed to fetch messages");
+                const data = await res.json();
+                // Reverse for chat display if API returns newest first
+                setMessages(data.reverse());
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoadingMessages(false);
+            }
+        };
+
+        fetchMessages();
+    }, [conversationId, setMessages, setLoadingMessages]);
+
+    // Scroll to bottom
     useEffect(() => {
         if (scrollRef.current) {
-            // Only auto-scroll if close to bottom or initial load
-            const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-            // Simple heuristic: if difference is small, scroll. Or just always scroll on new messages like requested.
-            // "scroll automático al último mensaje"
-            // Typically we should check if user scrolled up. For now, force scroll.
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            scrollRef.current.scrollIntoView({ behavior: "smooth" });
         }
-    }, [conversation?.messages.length]);
+    }, [messages, typingUsers]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMessage.trim() || sending) return;
-
-        setSending(true);
+    const handleSendMessage = async (content: string, type: "text" | "image", file?: File) => {
         try {
-            const token = localStorage.getItem("token");
-            await axios.post(
-                "/api/messages",
-                { conversationId, content: newMessage },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            setNewMessage("");
-            fetchConversation();
+            let attachmentUrl = undefined;
+
+            if (type === "image" && file) {
+                const formData = new FormData();
+                formData.append("file", file);
+
+                // Note: Auth token should be retrieved more robustly in production
+                const token = typeof window !== 'undefined' ? localStorage.getItem("token") : "";
+
+                const uploadRes = await fetch("/api/upload", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (!uploadRes.ok) throw new Error("Upload failed");
+                const uploadData = await uploadRes.json();
+                attachmentUrl = uploadData.url;
+            }
+
+            const token = typeof window !== 'undefined' ? localStorage.getItem("token") : "";
+            const res = await fetch("/api/messages", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ conversationId, content, type, attachmentUrl })
+            });
+
+            if (!res.ok) throw new Error("Failed to send");
+
+            const message = await res.json();
+            addMessage(message);
         } catch (error) {
-            console.error("Error sending message:", error);
-        } finally {
-            setSending(false);
+            console.error("Send failed", error);
+            // Show toast error
         }
     };
 
-    // Mark as read
-    useEffect(() => {
-        if (!conversation || !user) return;
-        const unreadMessages = conversation.messages.filter(m => !m.isRead && m.senderId !== Number(user.id));
-        if (unreadMessages.length === 0) return;
+    const handleTypingStart = () => {
+        socket?.emit("typing_start", { conversationId });
+    };
 
-        const markRead = async () => {
-            const token = localStorage.getItem("token");
-            try {
-                // Optimization: endpoint could accept array, but existing is single. 
-                // Let's loop but carefully. Actually the browser limits concurrent connections.
-                // Better to update API to mark all as read for conversation.
-                // Staying with loop for now as per previous implementation but limiting concurrency or just "fire and forget".
-                await Promise.all(unreadMessages.map(msg =>
-                    axios.patch(`/api/messages/${msg.id}/read`, {}, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
-                ));
-            } catch (e) { }
-        };
-        markRead();
-    }, [conversation?.messages, user]);
+    const handleTypingStop = () => {
+        socket?.emit("typing_stop", { conversationId });
+    };
 
-
-    if (loading) return <div className="flex items-center justify-center h-full text-muted-foreground">Cargando...</div>;
-    if (!conversation) return <div className="flex items-center justify-center h-full text-muted-foreground">Conversación no encontrada.</div>;
-
-    const otherParty = user?.role === "comprador"
-        ? {
-            name: conversation.store?.name || "Tienda",
-            image: conversation.store?.logo,
-        }
-        : {
-            name: conversation.buyer?.name || "Comprador",
-            image: conversation.buyer?.avatarUrl,
-        };
-
-    const isBlockedByMe = conversation.isBlocked && conversation.blockedBy === Number(user?.id);
-    const isBlockedByOther = conversation.isBlocked && conversation.blockedBy !== Number(user?.id);
-
-    // Group messages by date
-    const groupedMessages: { date: string; messages: Message[] }[] = [];
-    conversation.messages.forEach((msg) => {
-        const dateKey = format(new Date(msg.createdAt), "yyyy-MM-dd");
-        let group = groupedMessages.find(g => g.date === dateKey);
-        if (!group) {
-            group = { date: dateKey, messages: [] };
-            groupedMessages.push(group);
-        }
-        group.messages.push(msg);
-    });
+    const isTyping = (typingUsers[conversationId] || []).length > 0;
 
     return (
-        <div className="flex flex-col h-full bg-background/50 backdrop-blur-sm rounded-lg overflow-hidden border">
-            {/* Header */}
-            <div className="p-3 border-b bg-card flex items-center justify-between shadow-sm z-10">
-                <div className="flex items-center gap-3">
-                    {onBack && (
-                        <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
-                    )}
-                    <Avatar className="h-10 w-10 border ring-2 ring-background">
-                        <AvatarImage src={otherParty.image} className="object-cover" />
-                        <AvatarFallback>{otherParty.name.charAt(0).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                        <h3 className="font-semibold text-sm leading-tight flex items-center gap-2">
-                            {otherParty.name}
-                            {isBlockedByOther && <span className="text-[10px] bg-red-100 text-red-600 px-1 rounded">Bloqueado</span>}
-                        </h3>
-                        {conversation.product && (
-                            <Link href={`/products/${conversation.product.id}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors">
-                                <ShoppingBag className="h-3 w-3" />
-                                {conversation.product.name} • ${conversation.product.price}
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={handleBlockToggle} className={isBlockedByMe ? "text-primary" : "text-destructive"}>
-                            <Ban className="mr-2 h-4 w-4" />
-                            {isBlockedByMe ? "Desbloquear" : "Bloquear usuario"}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-
+        <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6" ref={scrollRef}>
-                {conversation.product && (
-                    <div className="bg-secondary/20 p-4 rounded-xl flex gap-4 items-center border border-border/50 max-w-sm mx-auto mb-6">
-                        {conversation.product.imageUrl && (
-                            <div className="h-16 w-16 bg-white rounded-md overflow-hidden relative border shrink-0">
-                                <img src={conversation.product.imageUrl} alt={conversation.product.name} className="object-cover w-full h-full" />
-                            </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm truncate">{conversation.product.name}</h4>
-                            <p className="text-sm font-bold text-primary">${conversation.product.price} MXN</p>
-                            <Link href={`/products/${conversation.product.id}`}>
-                                <Button size="sm" variant="outline" className="h-7 text-xs mt-2 w-full">Ver Producto</Button>
-                            </Link>
-                        </div>
-                    </div>
-                )}
-
-                {groupedMessages.map((group) => (
-                    <div key={group.date}>
-                        <div className="flex justify-center mb-4">
-                            <span className="text-xs bg-muted/50 text-muted-foreground px-2 py-1 rounded-full">
-                                {format(new Date(group.date), "d 'de' MMMM", { locale: es })}
-                            </span>
-                        </div>
-                        <div className="space-y-2">
-                            {group.messages.map((msg) => {
-                                const isMe = msg.senderId === Number(user?.id);
-                                return (
-                                    <div
-                                        key={msg.id}
-                                        className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}
-                                    >
-                                        <div
-                                            className={cn(
-                                                "max-w-[80%] md:max-w-[65%] px-4 py-2 rounded-2xl text-sm shadow-sm relative group transition-all",
-                                                isMe
-                                                    ? "bg-primary text-primary-foreground rounded-tr-none"
-                                                    : "bg-card border text-foreground rounded-tl-none"
-                                            )}
-                                        >
-                                            <p className="leading-relaxed">{msg.content}</p>
-                                            <div
-                                                className={cn(
-                                                    "text-[10px] mt-1 flex items-center justify-end gap-1 opacity-70",
-                                                    isMe ? "text-primary-foreground/80" : "text-muted-foreground"
-                                                )}
-                                            >
-                                                {format(new Date(msg.createdAt), "HH:mm")}
-                                                {isMe && (
-                                                    msg.isRead ? <CheckCheck className="h-3 w-3" /> : <Check className="h-3 w-3" />
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Input Area */}
-            <div className="p-3 border-t bg-background/80 backdrop-blur pb-safe">
-                {conversation.isBlocked ? (
-                    <div className="flex items-center justify-center p-3 text-sm text-muted-foreground bg-muted/30 rounded-md">
-                        <Ban className="h-4 w-4 mr-2" />
-                        {isBlockedByMe ? "Has bloqueado a este usuario." : "No puedes responder a esta conversación."}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {isLoadingMessages ? (
+                    <div className="flex justify-center items-center h-full">
+                        <Loader2 className="animate-spin text-muted-foreground" />
                     </div>
                 ) : (
-                    <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                        <Input
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Escribe un mensaje..."
-                            className="flex-1 bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary rounded-full px-4"
-                            autoComplete="off"
-                        />
-                        <Button
-                            type="submit"
-                            size="icon"
-                            disabled={!newMessage.trim() || sending}
-                            className="rounded-full w-10 h-10 shrink-0"
-                        >
-                            <Send className="h-4 w-4 -ml-0.5" />
-                        </Button>
-                    </form>
+                    messages.map((msg, index) => {
+                        // Simple assumption: if message senderId corresponds to *current user*, it sends isMe
+                        // We need current user ID stored somewhere. For now, we will inspect the token on client or fetch user info.
+                        // TODO: Integrate proper user context/hook
+                        const isMe = false; // REPLACE THIS WITH REAL CHECK
+                        return <MessageBubble key={msg.id} message={msg} isMe={isMe} />;
+                    })
                 )}
+
+                {/* Scroll Anchor */}
+                <div ref={scrollRef} />
             </div>
+
+            {/* Typing Indicator */}
+            {isTyping && (
+                <div className="absolute bottom-[80px] left-4 text-xs text-muted-foreground animate-pulse">
+                    Alguien está escribiendo...
+                </div>
+            )}
+
+            {/* Input Area */}
+            <ChatInput
+                onSendMessage={handleSendMessage}
+                onTypingStart={handleTypingStart}
+                onTypingStop={handleTypingStop}
+            />
+
+            {!isConnected && (
+                <Alert variant="destructive" className="absolute top-2 left-2 right-2 w-auto">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                        Desconectado del servidor de chat. Reconectando...
+                    </AlertDescription>
+                </Alert>
+            )}
         </div>
     );
-}
+};

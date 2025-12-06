@@ -126,6 +126,12 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "vittorioforti.com.mx",
+        port: "",
+        pathname: "/**",
+      },
     ],
   },
   webpack: (config) => {

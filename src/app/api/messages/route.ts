@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Message, Conversation, User } from "@/models";
+import { Message, Conversation } from "@/models";
+import { MessageService } from "@/services/messageService";
+import { NotificationService } from "@/services/notificationService";
 import jwt from "jsonwebtoken";
 
 async function getUser(req: NextRequest) {
@@ -29,12 +31,8 @@ export async function POST(req: NextRequest) {
 
         // Check if user is part of the conversation
         const conversation = await Conversation.findByPk(conversationId, {
-            include: ["store", "buyer"] // Might need to be more specific or use standard include
+            include: ["store", "buyer"]
         });
-
-        // NOTE: In previous tool call I updated index.ts, so string aliases should work if defined correctly.
-        // However, it's safer to not rely on string alias if not sure. 
-        // But index.ts has `as: "store"` and `as: "buyer"`.
 
         if (!conversation) {
             return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -43,29 +41,33 @@ export async function POST(req: NextRequest) {
         const isBuyer = conversation.buyerId === user.id;
         const storeOwnerId = (conversation as any).store?.userId;
 
-        // If not buyer and not store owner
+        // Authorization
         if (!isBuyer && storeOwnerId !== user.id) {
-            // Wait, we need to load the store to check owner if we don't trust the client or if we didn't include it. 
-            // In `findByPk` above I included "store".
-            if ((conversation as any).store?.userId !== user.id) {
+            if ((conversation as any).store?.userId !== user.id) { // Double check if association didn't load properly
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
         }
 
-        // Check if blocked
         if (conversation.isBlocked) {
             return NextResponse.json({ error: "Conversation is blocked" }, { status: 403 });
         }
 
-        const message = await Message.create({
+        // Use Service
+        const message = await MessageService.createMessage({
             conversationId,
             senderId: user.id,
             content,
+            // TODO: Handle type from body if we want mixed content support here
+            type: body.type || "text",
+            replyToId: body.replyToId
         });
 
-        // Update conversation timestamp
-        conversation.lastMessageAt = new Date();
-        await conversation.save();
+        // Notify
+        await NotificationService.notifyConversationUpdate(
+            conversationId,
+            "message:new",
+            message
+        );
 
         return NextResponse.json(message);
     } catch (error) {
