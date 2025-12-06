@@ -68,7 +68,7 @@ export const ConversationList = ({ onSelect, selectedId }: ConversationListProps
                                 key={conv.id}
                                 onClick={() => onSelect(conv.id)}
                                 className={cn(
-                                    "w-full text-left p-4 hover:bg-slate-50 transition-colors border-b last:border-0 flex gap-3",
+                                    "w-full text-left p-4 hover:bg-slate-50 active:bg-slate-100 transition-colors border-b last:border-0 flex gap-3",
                                     selectedId === conv.id && "bg-slate-100 ring-2 ring-inset ring-primary/10"
                                 )}
                             >

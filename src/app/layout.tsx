@@ -9,6 +9,7 @@ import { ShoppingCart, PackagePlus, Search, Loader2, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/toaster";
 import { UserNav } from "@/components/layout/user-nav";
+import { MobileNav } from "@/components/layout/MobileNav";
 import { Input } from "@/components/ui/input";
 import { CartProvider, useCart } from "@/context/CartContext"; // Import CartProvider and useCart
 import { AuthProvider, useAuth } from "@/context/AuthContext"; // Import AuthProvider and useAuth
@@ -151,7 +152,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 <Skeleton className="h-8 w-[80px]" />
               </div>
             ) : user ? (
-              <UserNav user={user} onLogout={logout} /> // Pass logout from context
+              <UserNav user={user} onLogout={logout} />
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/login">
@@ -169,10 +170,13 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="flex-1 w-full flex flex-col">{children}</main>
+      <main className="flex-1 w-full flex flex-col pb-16 md:pb-0">
+        {children}
+      </main>
       <Toaster />
+      <MobileNav />
       {/* Simplified Footer */}
-      <footer className="w-full py-6 md:py-8 border-t bg-background">
+      <footer className="w-full py-6 md:py-8 border-t bg-background hidden md:block">
         <div className="container mx-auto flex flex-col items-center justify-between gap-4 md:flex-row">
           <p className="text-center text-xs text-muted-foreground md:text-left">
             © {new Date().getFullYear()} TextiSur. Todos los derechos reservados.

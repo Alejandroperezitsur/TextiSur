@@ -29,8 +29,7 @@ interface UserNavProps {
 }
 
 import { useNotifications } from "@/context/NotificationsContext";
-
-import { MessageSquare } from "lucide-react"; // Import MessageSquare
+import { MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import axios from "axios";
 

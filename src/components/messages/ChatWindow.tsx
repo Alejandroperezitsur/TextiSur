@@ -5,14 +5,17 @@ import { useSocket } from "@/context/SocketContext";
 import { useChatStore } from "@/hooks/useChatStore";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 interface ChatWindowProps {
     conversationId: number;
+    onBack?: () => void;
+    onToggleDetails?: () => void;
 }
 
-export const ChatWindow = ({ conversationId }: ChatWindowProps) => {
+export const ChatWindow = ({ conversationId, onBack, onToggleDetails }: ChatWindowProps) => {
     const { socket, isConnected } = useSocket();
     const {
         messages,
@@ -151,6 +154,27 @@ export const ChatWindow = ({ conversationId }: ChatWindowProps) => {
 
     return (
         <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
+            {/* Header - Mobile Only mostly, but good for all? 
+                User requested "Ver producto" button.
+                Let's make a proper header.
+            */}
+            <div className="flex items-center justify-between px-4 py-2 bg-white border-b shadow-sm h-14 flex-shrink-0 z-10">
+                <div className="flex items-center gap-2">
+                    {onBack && (
+                        <Button variant="ghost" size="icon" className="md:hidden -ml-2" onClick={onBack}>
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    )}
+                    <h3 className="font-semibold text-sm">Chat</h3>
+                </div>
+                {onToggleDetails && (
+                    <Button variant="ghost" size="icon" className="xl:hidden" onClick={onToggleDetails}>
+                        <Info className="h-5 w-5" />
+                        <span className="sr-only">Ver detalles</span>
+                    </Button>
+                )}
+            </div>
+
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {isLoadingMessages ? (
