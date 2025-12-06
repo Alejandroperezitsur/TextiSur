@@ -18,7 +18,7 @@ export class ChatService {
             include: [
                 { model: User, as: "buyer", attributes: ["id", "name", "email"] },
                 { model: Store, as: "store", attributes: ["id", "name"] },
-                { model: Product, as: "product", attributes: ["id", "name", "price", "images"] },
+                { model: Product, as: "product", attributes: ["id", "name", "price", "imageUrl"] },
             ],
             order: [["lastMessageAt", "DESC"]],
         });

@@ -8,7 +8,7 @@ const registerSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6).max(32),
     role: z.enum(["comprador", "vendedor"]),
-    avatarUrl: z.string().optional(),
+    avatarUrl: z.string().nullable().optional(),
 });
 
 export async function POST(request: Request) {

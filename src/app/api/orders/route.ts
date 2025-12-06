@@ -21,7 +21,7 @@ const orderSchema = z.object({
     total: z.number(),
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
+const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro";
 
 export async function POST(request: Request) {
     try {
