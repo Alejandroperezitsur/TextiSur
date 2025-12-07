@@ -3,15 +3,9 @@ import { Subscription, Conversation, Store } from "@/models";
 import { PushService } from "./pushService";
 import { Op } from "sequelize";
 
-// Configure web-push
-const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "BJwF5w70sF8K5A6B7C8D9E0F1G2H3I4J5K6L7M8N9O0P1Q2R3S4T5U6V7W8X9Y0Z";
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "tu_private_key_aqui"; // USER MUST CONFIGURE THIS
-
-webpush.setVapidDetails(
-    "mailto:example@yourdomain.org",
-    publicVapidKey,
-    privateVapidKey
-);
+// web-push is configured in PushService
+// const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+// const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
 
 export class NotificationService {
     static async notifyUser(userId: number, type: string, payload: any) {

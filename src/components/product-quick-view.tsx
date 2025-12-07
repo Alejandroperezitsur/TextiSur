@@ -58,7 +58,7 @@ export function ProductQuickView({ product }: ProductQuickViewProps) {
                 `https://picsum.photos/seed/product-${product.id}/600/600`,
             quantity: 1,
             size: selectedSize,
-            storeId: String(product.storeId),
+            storeId: product.storeId ? Number(product.storeId) : undefined,
         };
         addToCart(itemToAdd);
         toast({
@@ -91,6 +91,7 @@ export function ProductQuickView({ product }: ProductQuickViewProps) {
                             }
                             alt={product.name}
                             fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             className="object-cover"
                         />
                     </div>

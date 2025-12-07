@@ -4,8 +4,8 @@ import { Order, OrderItem, Product, User } from "@/models";
 import jwt from "jsonwebtoken";
 
 // Ideally this key should be in env
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-    apiVersion: "2024-11-20.acacia", // Use latest API version available
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_123", {
+    apiVersion: "2024-11-20.acacia" as any, // Use specific version or cast to any to avoid TS mismatch
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro_123";
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
                     currency: "mxn",
                     product_data: {
                         name: product.name,
-                        images: product.images ? [product.images[0]] : [], // Assuming array or string
+                        images: product.imageUrl ? [product.imageUrl] : [], // Use imageUrl from model
                     },
                     unit_amount: unitAmount,
                 },

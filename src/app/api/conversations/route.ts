@@ -4,11 +4,16 @@ import jwt from "jsonwebtoken";
 
 async function getUser(req: NextRequest) {
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) return null;
+    if (!authHeader) {
+        console.log("Auth Debug: No authorization header");
+        return null;
+    }
     const token = authHeader.split(" ")[1];
     try {
-        return jwt.verify(token, process.env.JWT_SECRET || "secreto_super_seguro") as any;
-    } catch (e) {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "secreto_super_seguro") as any;
+        return decoded;
+    } catch (e: any) {
+        console.log("Auth Debug: Token verification failed:", e.message);
         return null;
     }
 }

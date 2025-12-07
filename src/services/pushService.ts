@@ -5,8 +5,8 @@ import { Op } from "sequelize";
 // Initialize VAPID
 // In production, these should come strictly from process.env
 // For development/first-run, we might fallback or warn.
-const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY!;
+const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "";
 
 if (!publicVapidKey || !privateVapidKey) {
     console.warn("VAPID Keys not set. Push notifications will not work.");
