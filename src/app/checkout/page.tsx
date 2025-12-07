@@ -1,274 +1,124 @@
 "use client";
 
+import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { useCart } from "@/context/CartContext";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function CheckoutPage() {
-    const { cartItems, clearCart } = useCart();
-    const { toast } = useToast();
-    const router = useRouter();
+    const { cartItems, total, clearCart } = useCart();
     const { user } = useAuth();
+    const router = useRouter();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(false);
 
+    // Mock form state
     const [formData, setFormData] = useState({
-        fullName: "",
         address: "",
         city: "",
-        zipCode: "",
-        cardNumber: "",
-        expiryDate: "",
-        cvv: "",
+        zip: "",
+        card: "4242424242424242",
+        expiry: "12/26",
+        cvc: "123"
     });
 
-    const subtotal = cartItems.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-    );
-    const shippingThreshold = 500;
-    const shippingCost = 50;
-    const shipping =
-        subtotal > shippingThreshold || subtotal === 0 ? 0.0 : shippingCost;
-    const total = subtotal + shipping;
-
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setFormData({ ...formData, [e.target.id]: e.target.value });
     };
 
-    const handlePlaceOrder = async (e: React.FormEvent) => {
+    const handleCheckout = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (cartItems.length === 0) {
-            toast({
-                title: "Carrito vacío",
-                description: "No puedes realizar un pedido sin artículos.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        if (!user) {
-            toast({
-                title: "Inicia sesión",
-                description: "Debes iniciar sesión para realizar un pedido.",
-                variant: "destructive",
-            });
-            router.push("/login");
-            return;
-        }
-
         setLoading(true);
 
         try {
-            const response = await fetch("/api/orders", {
+            const res = await fetch("/api/checkout", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    Authorization: `Bearer ${localStorage.getItem("token")}`
                 },
                 body: JSON.stringify({
-                    items: cartItems,
-                    shippingDetails: {
-                        fullName: formData.fullName,
-                        address: formData.address,
-                        city: formData.city,
-                        zipCode: formData.zipCode,
-                    },
-                    total: total,
-                }),
+                    items: cartItems.map(item => ({
+                        productId: item.id,
+                        quantity: item.quantity
+                    }))
+                })
             });
 
-            if (response.ok) {
-                clearCart();
-                toast({
-                    title: "¡Pedido Realizado!",
-                    description: "Tu pedido ha sido procesado exitosamente.",
-                });
-                router.push("/dashboard/comprador"); // Redirect to buyer dashboard
+            if (!res.ok) throw new Error("Failed to create checkout session");
+
+            const data = await res.json();
+
+            if (data.url) {
+                // Redirect to Stripe Checkout
+                window.location.href = data.url;
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.message || "Error al procesar el pedido");
+                throw new Error("No checkout URL returned");
             }
+
         } catch (error) {
+            console.error("Checkout error:", error);
             toast({
-                title: "Error",
-                description:
-                    error instanceof Error ? error.message : "Hubo un problema al procesar tu pedido.",
-                variant: "destructive",
+                title: "Error al iniciar pago",
+                description: "Inténtalo de nuevo más tarde.",
+                variant: "destructive"
             });
-        } finally {
             setLoading(false);
         }
     };
 
+    if (!user) {
+        return (
+            <div className="container mx-auto p-12 text-center">
+                <p>Debes iniciar sesión para finalizar la compra.</p>
+                <Button onClick={() => router.push("/login?redirect=/checkout")} className="mt-4">Iniciar Sesión</Button>
+            </div>
+        )
+    }
+
+    if (cartItems.length === 0) {
+        router.push("/cart");
+        return null;
+    }
+
     return (
-        <div className="container mx-auto py-12 px-4 md:px-6">
-            <h1 className="text-3xl font-bold mb-8 text-center">Finalizar Compra</h1>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                {/* Shipping & Payment Form */}
-                <div>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Detalles de Envío y Pago</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form id="checkout-form" onSubmit={handlePlaceOrder} className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="fullName">Nombre Completo</Label>
-                                    <Input
-                                        id="fullName"
-                                        name="fullName"
-                                        required
-                                        placeholder="Juan Pérez"
-                                        value={formData.fullName}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">Dirección</Label>
-                                    <Input
-                                        id="address"
-                                        name="address"
-                                        required
-                                        placeholder="Calle Principal 123"
-                                        value={formData.address}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="city">Ciudad</Label>
-                                        <Input
-                                            id="city"
-                                            name="city"
-                                            required
-                                            placeholder="Ciudad de México"
-                                            value={formData.city}
-                                            onChange={handleInputChange}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="zipCode">Código Postal</Label>
-                                        <Input
-                                            id="zipCode"
-                                            name="zipCode"
-                                            required
-                                            placeholder="12345"
-                                            value={formData.zipCode}
-                                            onChange={handleInputChange}
-                                        />
-                                    </div>
-                                </div>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-3xl font-bold mb-8">Resumen de Compra</h1>
+            <div className="grid gap-8 lg:grid-cols-2">
 
-                                <Separator className="my-4" />
-                                <h3 className="font-semibold mb-2">Método de Pago (Simulado)</h3>
+                <div className="space-y-6">
+                    <div className="rounded-lg border bg-muted/50 p-6">
+                        <h2 className="text-xl font-semibold mb-4">Items</h2>
+                        <ul className="space-y-4">
+                            {cartItems.map(item => (
+                                <li key={item.cartItemId} className="flex justify-between text-sm">
+                                    <span>{item.quantity}x {item.name} ({item.size})</span>
+                                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="border-t mt-4 pt-4 flex justify-between font-bold text-lg">
+                            <span>Total</span>
+                            <span>${total.toFixed(2)}</span>
+                        </div>
+                    </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="cardNumber">Número de Tarjeta</Label>
-                                    <Input
-                                        id="cardNumber"
-                                        name="cardNumber"
-                                        required
-                                        placeholder="0000 0000 0000 0000"
-                                        value={formData.cardNumber}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="expiryDate">Fecha de Expiración</Label>
-                                        <Input
-                                            id="expiryDate"
-                                            name="expiryDate"
-                                            required
-                                            placeholder="MM/YY"
-                                            value={formData.expiryDate}
-                                            onChange={handleInputChange}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cvv">CVV</Label>
-                                        <Input
-                                            id="cvv"
-                                            name="cvv"
-                                            required
-                                            placeholder="123"
-                                            value={formData.cvv}
-                                            onChange={handleInputChange}
-                                        />
-                                    </div>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
+                    <Button onClick={handleCheckout} className="w-full" size="lg" disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Pagar con Stripe
+                    </Button>
                 </div>
 
-                {/* Order Summary */}
-                <div>
-                    <Card className="sticky top-20">
-                        <CardHeader>
-                            <CardTitle>Resumen del Pedido</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                {cartItems.map((item) => (
-                                    <div key={`${item.id}-${item.size}`} className="flex justify-between text-sm">
-                                        <span>
-                                            {item.quantity}x {item.name} ({item.size})
-                                        </span>
-                                        <span>${(item.price * item.quantity).toFixed(2)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between text-muted-foreground">
-                                <span>Subtotal</span>
-                                <span>${subtotal.toFixed(2)} MXN</span>
-                            </div>
-                            <div className="flex justify-between text-muted-foreground">
-                                <span>Envío</span>
-                                <span>
-                                    {shipping === 0 ? "Gratis" : `$${shipping.toFixed(2)} MXN`}
-                                </span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>${total.toFixed(2)} MXN</span>
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button
-                                type="submit"
-                                form="checkout-form"
-                                className="w-full btn-accent"
-                                size="lg"
-                                disabled={loading || cartItems.length === 0}
-                            >
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando...
-                                    </>
-                                ) : (
-                                    "Confirmar Pedido"
-                                )}
-                            </Button>
-                        </CardFooter>
-                    </Card>
+                <div className="text-sm text-muted-foreground p-4">
+                    <p>Al hacer clic en "Pagar con Stripe", serás redirigido a una pasarela segura para completar tu transacción.</p>
+                    <p className="mt-2">Aceptamos tarjetas de crédito, débito y Google/Apple Pay.</p>
                 </div>
+
             </div>
         </div>
     );

@@ -12,6 +12,8 @@ interface StoreAttributes {
   logo?: string;
   userId: number;
   slug: string;
+  latitude?: number;
+  longitude?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -31,8 +33,7 @@ type StoreCreationAttributes = Optional<
 
 class Store
   extends Model<StoreAttributes, StoreCreationAttributes>
-  implements StoreAttributes
-{
+  implements StoreAttributes {
   declare id: number;
   declare name: string;
   declare description?: string;
@@ -43,6 +44,8 @@ class Store
   declare logo?: string;
   declare userId: number;
   declare slug: string;
+  declare latitude?: number;
+  declare longitude?: number;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -85,6 +88,14 @@ Store.init(
       type: DataTypes.STRING(100),
       allowNull: false,
       unique: true,
+    },
+    latitude: {
+      type: DataTypes.DECIMAL(10, 8),
+      allowNull: true,
+    },
+    longitude: {
+      type: DataTypes.DECIMAL(11, 8),
+      allowNull: true,
     },
   },
   {

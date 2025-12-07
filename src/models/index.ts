@@ -8,6 +8,10 @@ import Reaction from "./Reaction";
 import Block from "./Block";
 
 // Define associations
+import Subscription from "./Subscription";
+User.hasMany(Subscription, { foreignKey: "userId", as: "subscriptions" });
+Subscription.belongsTo(User, { foreignKey: "userId", as: "user" });
+
 User.hasMany(Store, { foreignKey: "userId", as: "stores" });
 Store.belongsTo(User, { foreignKey: "userId", as: "owner" });
 
@@ -17,9 +21,12 @@ Product.belongsTo(Store, { foreignKey: "storeId", as: "store" });
 User.hasMany(Order, { foreignKey: "userId", as: "orders" });
 Order.belongsTo(User, { foreignKey: "userId", as: "user" });
 
-Product.hasMany(Order, { foreignKey: "productId", as: "orders" });
-
-Order.belongsTo(Product, { foreignKey: "productId", as: "product" });
+// Order associations
+import OrderItem from "./OrderItem";
+Order.hasMany(OrderItem, { foreignKey: "orderId", as: "items" });
+OrderItem.belongsTo(Order, { foreignKey: "orderId", as: "order" });
+OrderItem.belongsTo(Product, { foreignKey: "productId", as: "product" });
+Product.hasMany(OrderItem, { foreignKey: "productId", as: "orderItems" });
 
 // Conversation associations
 Conversation.belongsTo(User, { foreignKey: "buyerId", as: "buyer" });
@@ -52,4 +59,4 @@ User.hasMany(Conversation, { foreignKey: "buyerId", as: "conversationsAsBuyer" }
 Store.hasMany(Conversation, { foreignKey: "storeId", as: "conversations" });
 
 // Export models
-export { User, Store, Product, Order, Conversation, Message, Block, Reaction };
+export { User, Store, Product, Order, Conversation, Message, Block, Reaction, Subscription, OrderItem };

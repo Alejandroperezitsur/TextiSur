@@ -1,13 +1,11 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "@/lib/sequelize";
 import User from "./User";
-import Product from "./Product";
 
 interface OrderAttributes {
   id: number;
   userId: number;
-  productId: number;
-  quantity: number;
+  stripePaymentId?: string;
   total: number;
   status: "pendiente" | "enviado" | "entregado";
   createdAt?: Date;
@@ -19,8 +17,7 @@ type OrderCreationAttributes = Optional<OrderAttributes, "id" | "createdAt" | "u
 class Order extends Model<OrderAttributes, OrderCreationAttributes> implements OrderAttributes {
   declare id: number;
   declare userId: number;
-  declare productId: number;
-  declare quantity: number;
+  declare stripePaymentId?: string;
   declare total: number;
   declare status: "pendiente" | "enviado" | "entregado";
   declare readonly createdAt: Date;
@@ -42,17 +39,9 @@ Order.init(
         key: "id",
       },
     },
-    productId: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
-      references: {
-        model: Product,
-        key: "id",
-      },
-    },
-    quantity: {
-      type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+    stripePaymentId: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
     total: {
       type: DataTypes.DECIMAL(10, 2),

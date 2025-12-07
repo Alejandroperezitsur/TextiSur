@@ -1,11 +1,10 @@
-// src/types/cart.ts
-
-export type CartItem = {
+export interface CartItem {
   id: number;
   name: string;
-  price: number; // Use number for calculations
-  imageUrl: string;
+  price: number;
   quantity: number;
-  size: string; // Size selection
-  storeId?: string; // ID de la tienda asociada
-};
+  imageUrl?: string;
+  size?: string;
+  cartItemId?: string; // Optional for external usage, required internally
+  storeId?: number;
+}

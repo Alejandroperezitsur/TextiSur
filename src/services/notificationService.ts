@@ -1,3 +1,18 @@
+import webpush from "web-push";
+import { Subscription, Conversation, Store } from "@/models";
+import { PushService } from "./pushService";
+import { Op } from "sequelize";
+
+// Configure web-push
+const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "BJwF5w70sF8K5A6B7C8D9E0F1G2H3I4J5K6L7M8N9O0P1Q2R3S4T5U6V7W8X9Y0Z";
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || "tu_private_key_aqui"; // USER MUST CONFIGURE THIS
+
+webpush.setVapidDetails(
+    "mailto:example@yourdomain.org",
+    publicVapidKey,
+    privateVapidKey
+);
+
 export class NotificationService {
     static async notifyUser(userId: number, type: string, payload: any) {
         // Validation
@@ -14,9 +29,7 @@ export class NotificationService {
                 payload,
                 createdAt: new Date()
             });
-            console.log(`Notification sent to user_${userId}: ${type}`);
-        } else {
-            console.warn("Socket.io instance not found, notification skipped for now");
+            // console.log(`Notification sent to user_${userId}: ${type}`);
         }
     }
 
@@ -26,6 +39,37 @@ export class NotificationService {
             // In a real app, you might want to emit to specific users in the conversation
             // For now, emitting to the conversation room
             io.to(`conversation_${conversationId}`).emit(type, payload);
+        }
+
+        // Send Push Notification for new messages
+        if (type === "message:new") {
+            try {
+                const conversation = await Conversation.findByPk(conversationId, {
+                    include: [
+                        { model: Store, as: "store" }
+                    ]
+                });
+
+                if (!conversation) return;
+
+                const buyerId = conversation.buyerId;
+                const sellerId = (conversation as any).store?.userId;
+                const senderId = payload.senderId;
+
+                // Determine recipient: The one NOT sending the message
+                const recipientId = senderId === buyerId ? sellerId : buyerId;
+
+                if (recipientId) {
+                    await PushService.sendToUser(recipientId, {
+                        title: "Nuevo Mensaje",
+                        body: payload.content ? payload.content.substring(0, 50) + (payload.content.length > 50 ? "..." : "") : "Has recibido un mensaje",
+                        url: `/messages/${conversationId}`
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error processing push notification:", error);
+            }
         }
     }
 }

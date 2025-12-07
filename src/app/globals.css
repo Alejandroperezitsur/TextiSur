@@ -15,6 +15,10 @@
   .transition-all-smooth {
     transition: all 0.3s ease-in-out;
   }
+
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 @keyframes fadeIn {

@@ -1,90 +1,64 @@
-import { NextResponse } from "next/server";
-import { Order, Product, User } from "@/models";
-import { z } from "zod";
+import { NextRequest, NextResponse } from "next/server";
+import { User, Order, OrderItem, Product } from "@/models";
+import sequelize from "@/lib/sequelize";
 import jwt from "jsonwebtoken";
-import { cookies } from "next/headers";
 
-const orderSchema = z.object({
-    items: z.array(
-        z.object({
-            id: z.number(),
-            quantity: z.number(),
-            price: z.number(),
-        })
-    ),
-    shippingDetails: z.object({
-        fullName: z.string(),
-        address: z.string(),
-        city: z.string(),
-        zipCode: z.string(),
-    }),
-    total: z.number(),
-});
+const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro_123";
 
-const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro";
-
-export async function POST(request: Request) {
+async function getUser(req: NextRequest) {
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) return null;
+    const token = authHeader.split(" ")[1];
     try {
-        // 1. Verify User
-        const cookieStore = await cookies();
-        const token = cookieStore.get("token")?.value;
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        return await User.findByPk(decoded.userId);
+    } catch (e) {
+        return null;
+    }
+}
 
-        if (!token) {
-            return NextResponse.json(
-                { message: "No autorizado" },
-                { status: 401 }
-            );
+export async function POST(req: NextRequest) {
+    const transaction = await sequelize.transaction();
+    try {
+        const user = await getUser(req);
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        let userId: number;
-        try {
-            const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
-            userId = decoded.userId;
-        } catch (error) {
-            return NextResponse.json(
-                { message: "Token inválido" },
-                { status: 401 }
-            );
+        const body = await req.json();
+        const { items, total } = body; // items: [{ productId, quantity, price }]
+
+        if (!items || items.length === 0) {
+            return NextResponse.json({ error: "No items in order" }, { status: 400 });
         }
 
-        // 2. Validate Body
-        const body = await request.json();
-        const validation = orderSchema.safeParse(body);
+        // Create Order
+        const order = await Order.create({
+            userId: user.id,
+            total,
+            status: "pendiente",
+            stripePaymentId: "mock_stripe_id_" + Date.now()
+        }, { transaction });
 
-        if (!validation.success) {
-            return NextResponse.json(
-                { message: "Datos inválidos", errors: validation.error.errors },
-                { status: 400 }
-            );
+        // Create Order Items
+        for (const item of items) {
+            await OrderItem.create({
+                orderId: order.id,
+                productId: item.productId,
+                quantity: item.quantity,
+                price: item.price
+            }, { transaction });
+
+            // Reduce stock (Optional, depending on business logic)
+            // await Product.decrement('stock', { by: item.quantity, where: { id: item.productId }, transaction });
         }
 
-        const { items, total } = validation.data;
+        await transaction.commit();
+        return NextResponse.json(order);
 
-        // 3. Create Orders (One per item, as per current schema)
-        // In a real app, we'd have an OrderHeader and OrderItems.
-        // Here we simulate it by creating multiple Order records.
-
-        const ordersToCreate = items.map((item) => ({
-            userId,
-            productId: item.id,
-            quantity: item.quantity,
-            total: item.price * item.quantity, // Total for this line item
-            status: "pendiente" as "pendiente" | "enviado" | "entregado",
-        }));
-
-        await Order.bulkCreate(ordersToCreate);
-
-        // Optional: Update Stock (if we had a stock field and logic)
-
-        return NextResponse.json(
-            { message: "Pedido creado exitosamente" },
-            { status: 201 }
-        );
     } catch (error) {
+        await transaction.rollback();
         console.error("Error creating order:", error);
-        return NextResponse.json(
-            { message: "Error interno del servidor" },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
