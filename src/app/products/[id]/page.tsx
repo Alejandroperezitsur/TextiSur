@@ -62,6 +62,7 @@ export default function ProductDetailPage({
   const { toast } = useToast();
   const { addToCart } = useCart(); // Get addToCart from context
   const router = useRouter(); // Use router for back navigation
+  const { user } = useAuth(); // Move useAuth to top of component
   const resolvedParams = use(params);
   const pid = Number(resolvedParams.id);
   const [product, setProduct] = useState<UiProduct | null>(null);
@@ -209,7 +210,6 @@ export default function ProductDetailPage({
   };
 
   const stock = product.stock ?? 0;
-  const { user } = useAuth(); // Import useAuth
 
   const handleContactSeller = async () => {
     if (!user) {

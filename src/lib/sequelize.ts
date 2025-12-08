@@ -1,4 +1,5 @@
 import { Sequelize } from "sequelize";
+import mysql2 from "mysql2";
 
 // Configuración de Sequelize para conectarse a la base de datos local
 const sequelize = new Sequelize(
@@ -8,7 +9,7 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST || "localhost",
     dialect: "mysql",
-    dialectModule: require('mysql2'),
+    dialectModule: mysql2,
     logging: process.env.NODE_ENV === "development" ? console.log : false,
     pool: {
       max: 10,
