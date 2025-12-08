@@ -558,7 +558,7 @@ export default function HomePage() {
       imageUrl: product.imageUrl || `https://picsum.photos/seed/product-${product.id}/400/500`,
       quantity: 1,
       size: product.sizes[0] || "N/A",
-      storeId: String(product.storeId),
+      storeId: product.storeId !== undefined ? String(product.storeId) : undefined,
     };
     addToCart(itemToAdd);
     toast({

@@ -1,4 +1,3 @@
-# Create a simple health check endpoint
 import { NextResponse } from 'next/server';
 
 export async function GET() {

@@ -40,11 +40,13 @@ export async function POST(request: Request) {
             email,
             password: hashedPassword,
             role,
-            avatarUrl,
+            avatarUrl: avatarUrl || undefined,
         });
 
+        const { password: _, ...userWithoutPassword } = newUser.toJSON();
+
         return NextResponse.json(
-            { message: "Usuario registrado exitosamente", user: newUser },
+            { message: "Usuario registrado exitosamente", user: userWithoutPassword },
             { status: 201 }
         );
     } catch (error) {

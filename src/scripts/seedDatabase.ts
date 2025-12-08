@@ -17,13 +17,13 @@ async function seedDatabase() {
       { name: "Lupita", email: "lupita@textisur.com", password: "password123", role: "comprador" },
       { name: "Juan", email: "juan@textisur.com", password: "password123", role: "comprador" },
       { name: "Maria", email: "maria@textisur.com", password: "password123", role: "comprador" },
-    ]);
+    ] as any);
 
     const stores = await Store.bulkCreate([
       { name: "Moda Uriangato", description: "Ropa de moda para toda la familia en Uriangato.", city: "Uriangato", userId: users[0].id, slug: "moda-uriangato" },
       { name: "Estilo Moroleón", description: "Las últimas tendencias de la moda en Moroleón.", city: "Moroleón", userId: users[1].id, slug: "estilo-moroleon" },
       { name: "Ropa y Más", description: "Todo lo que necesitas para vestir bien.", city: "Uriangato", userId: users[2].id, slug: "ropa-y-mas" },
-    ]);
+    ] as any);
 
     const products = await Product.bulkCreate([
       // Productos para Moda Uriangato
@@ -43,7 +43,7 @@ async function seedDatabase() {
       { name: "Falda Plisada", description: "Falda corta plisada.", price: 199.99, stock: 60, sizes: JSON.stringify(["S", "M", "L"]), category: "Faldas", imageUrl: "https://picsum.photos/seed/product-10/600/600", status: "Activo", storeId: stores[2].id },
       { name: "Chamarra de Piel", description: "Chamarra de piel sintética.", price: 599.99, stock: 25, sizes: JSON.stringify(["S", "M", "L"]), category: "Chamarras", imageUrl: "https://picsum.photos/seed/product-11/600/600", status: "Activo", storeId: stores[2].id },
       { name: "Calcetines Deportivos", description: "Paquete de 3 pares de calcetines.", price: 49.99, stock: 200, sizes: JSON.stringify(["Unitalla"]), category: "Accesorios", imageUrl: "https://picsum.photos/seed/product-12/600/600", status: "Activo", storeId: stores[2].id },
-    ]);
+    ] as any);
 
     await Order.bulkCreate([
       // Pedidos para Lupita
@@ -56,7 +56,7 @@ async function seedDatabase() {
       // Pedidos para Maria
       { userId: users[5].id, productId: products[8].id, quantity: 5, total: 399.95, status: "entregado" },
       { userId: users[5].id, productId: products[10].id, quantity: 1, total: 599.99, status: "enviado" },
-    ]);
+    ] as any);
 
     console.log("Base de datos poblada con éxito.");
   } catch (error) {

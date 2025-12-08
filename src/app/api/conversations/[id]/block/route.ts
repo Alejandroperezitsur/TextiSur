@@ -62,15 +62,15 @@ export async function POST(
         if (existingBlock) {
             await existingBlock.destroy();
             // Also unblock conversation if it was marked
-            await conversation.update({ isBlocked: false, blockedBy: null });
+            await conversation.update({ isBlocked: false, blockedBy: null as any });
             return NextResponse.json({ blocked: false });
         } else {
             await Block.create({
                 blockerId: user.id,
                 blockedId: blockedId
-            });
+            } as any);
             // Update conversation to show it is blocked
-            await conversation.update({ isBlocked: true, blockedBy: user.id });
+            await conversation.update({ isBlocked: true, blockedBy: user.id } as any);
             return NextResponse.json({ blocked: true });
         }
 

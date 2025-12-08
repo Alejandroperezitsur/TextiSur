@@ -188,7 +188,7 @@ export default function ProductDetailPage({
       imageUrl: product.imageUrl || `https://picsum.photos/seed/product-${pid}/600/600`,
       quantity: quantity,
       size: selectedSize || "N/A",
-      storeId: product.storeId,
+      storeId: product.storeId !== undefined ? String(product.storeId) : undefined,
     };
 
     addToCart(itemToAdd); // Add to global cart state

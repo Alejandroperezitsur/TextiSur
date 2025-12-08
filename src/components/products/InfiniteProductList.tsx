@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { ProductCard } from "@/components/products/ProductCard"; // Assume this exists
+import { ProductCard } from "@/components/products/ProductCard";
 import { Loader2 } from "lucide-react";
 
 // Simplified ProductCard if original is complex to import or modify, 
