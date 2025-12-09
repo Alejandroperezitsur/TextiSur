@@ -1,0 +1,13 @@
+{
+    "name": "generate-icons",
+    "version": "1.0.0",
+    "description": "PWA Icon generator for TextiSur",
+    "main": "generate-icons-canvas.js",
+    "scripts": {
+        "generate": "node generate-icons-canvas.js"
+    },
+    "dependencies": {
+        "canvas": "^2.11.2",
+        "sharp": "^0.33.5"
+    }
+}

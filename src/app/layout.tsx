@@ -22,6 +22,8 @@ import { NotificationsProvider } from "@/context/NotificationsContext";
 import { RatingsProvider } from "@/context/RatingsContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ModeToggle } from "@/components/mode-toggle";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { UpdateNotification } from "@/components/pwa/UpdateNotification";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -174,6 +176,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <Toaster />
+      <InstallPrompt />
+      <UpdateNotification />
       <MobileNav />
       {/* Simplified Footer */}
       <footer className="w-full py-6 md:py-8 border-t bg-background hidden md:block">
@@ -221,7 +225,19 @@ export default function MainLayout({
           name="description"
           content="Descubre, compra y vende prendas únicas de vendedores locales en TextiSur, el corazón de la industria textil."
         />
+        <meta name="application-name" content="TextiSur" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="TextiSur" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="theme-color" content="#6366f1" />
+
+        <link rel="manifest" href="/manifest.webmanifest" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-72x72.png" />
       </head>
       <body
         className={`${inter.variable} font-sans antialiased flex flex-col min-h-screen w-full`}
